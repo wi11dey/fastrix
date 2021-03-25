@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <time.h>
 
-size_t n0 = 27;
+size_t n0 = 43;
 
 struct matrix {
 	int* array;
