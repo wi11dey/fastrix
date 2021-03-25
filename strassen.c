@@ -276,7 +276,10 @@ int main(int argc, char** argv) {
 		for (int j = 0; j < dimension; j++) {
 			for (int k = 0; k < dimension; k++) {
 				int cell;
-				fscanf(input, "%d", &cell);
+				if (fscanf(input, "%d", &cell) != 1) {
+					fprintf(stderr, "failed to read inputfile %s\n", inputfile);
+					return -1;
+				}
 				in[i][j*dimension + k] = cell;
 			}
 		}
