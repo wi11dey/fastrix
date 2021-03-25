@@ -1,10 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-
-// #define NDEBUG
 #include <assert.h>
-#include <string.h>
 
 size_t n0 = 1;
 
@@ -19,15 +16,15 @@ struct matrix {
 };
 const struct matrix NULL_MATRIX = { NULL };
 
-/* inline */ size_t min(size_t a, size_t b) {
+inline size_t min(size_t a, size_t b) {
 	return (a < b) ? a : b;
 }
 
-/* inline */ size_t max(size_t a, size_t b) {
+inline size_t max(size_t a, size_t b) {
 	return (a > b) ? a : b;
 }
 
-/* inline */ struct matrix quadrant(struct matrix origin, bool i, bool j) {
+inline struct matrix quadrant(struct matrix origin, bool i, bool j) {
 	size_t newdim = origin.dimension>>1;
 	size_t
 		start_row = origin.start_row + i*newdim,
@@ -50,7 +47,7 @@ const struct matrix NULL_MATRIX = { NULL };
 	};
 }
 
-/* inline */ int get(struct matrix matrix, size_t row, size_t col) {
+inline int get(struct matrix matrix, size_t row, size_t col) {
 	assert(row < matrix.dimension && col < matrix.dimension);
 	if (!matrix.array) {
 		return 0;
