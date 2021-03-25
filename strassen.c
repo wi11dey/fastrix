@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <time.h>
 
-size_t n0 = 500;
+size_t n0 = 27;
 
 struct matrix {
 	int* array;
@@ -248,7 +249,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "usage: %s option dimension inputfile\n", (argc > 0) ? argv[0] : "./strassen");
 		fprintf(stderr, "\tif option == 0, read 2 dimension*dimension matrices A and B from inputfile and print the diagonal of AB\n");
 		fprintf(stderr, "\tif option == -1, find the crossover point n0\n");
-		fprintf(stderr, "\tif option > 0, count triangles in a graph of dimension vertices with each of the (dimension - 1)^2 edges included with probability option/100.0\n");
+		fprintf(stderr, "\tif option > 0, count triangles in a graph of 1024 vertices with each edge included with probability option/100.0\n");
 		return 1;
 	}
 
@@ -266,51 +267,167 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	int* in[2];
-	for (int i = 0; i < 2; i++) {
-		in[i] = malloc(dimension*dimension*sizeof(int));
-	}
+	if (!option) {
+		// Default behavior: multiply matrices in inputfile and print the diagonal.
+		int* in[2];
+		for (int i = 0; i < 2; i++) {
+			in[i] = malloc(dimension*dimension*sizeof(int));
+		}
 
-	FILE* input = fopen(inputfile, "r");
-	for (int i = 0; i < 2; i++) {
-		for (int j = 0; j < dimension; j++) {
-			for (int k = 0; k < dimension; k++) {
-				int cell;
-				if (fscanf(input, "%d", &cell) != 1) {
-					fprintf(stderr, "failed to read inputfile %s\n", inputfile);
-					return -1;
+		FILE* input = fopen(inputfile, "r");
+		for (int i = 0; i < 2; i++) {
+			for (int j = 0; j < dimension; j++) {
+				for (int k = 0; k < dimension; k++) {
+					int cell;
+					if (fscanf(input, "%d", &cell) != 1) {
+						fprintf(stderr, "failed to read inputfile %s\n", inputfile);
+						return -1;
+					}
+					in[i][j*dimension + k] = cell;
 				}
-				in[i][j*dimension + k] = cell;
 			}
 		}
-	}
-	fclose(input);
+		fclose(input);
 
-	struct matrix A = {
-		in[0],
-		dimension,
-		dimension,
-		padded,
-		0,
-		0
-	}, B = {
-		in[1],
-		dimension,
-		dimension,
-		padded,
-		0,
-		0
-	};
-	struct matrix C = strassen(A, B);
+		struct matrix A = {
+			in[0],
+			dimension,
+			dimension,
+			padded,
+			0,
+			0
+		}, B = {
+			in[1],
+			dimension,
+			dimension,
+			padded,
+			0,
+			0
+		};
+		struct matrix C = strassen(A, B);
 
-	for (int i = 0; i < dimension; i++) {
-		printf("%d\n", C.array[i*dimension + i]);
-	}
+		for (int i = 0; i < dimension; i++) {
+			printf("%d\n", C.array[i*dimension + i]);
+		}
 
-	for (int i = 0; i < 2; i++) {
-		free(in[i]);
+		for (int i = 0; i < 2; i++) {
+			free(in[i]);
+		}
+		free_matrix(C, NULL_MATRIX);
+	} else if (option == -1) {
+		// Optimize n0.
+		srand(time(NULL));
+
+		printf("  n0:  Time for naive:  Time for Strassen's:\n");
+		for (int d = 2; d <= dimension; d++) {
+			int* in[2];
+			for (int i = 0; i < 2; i++) {
+				in[i] = malloc(d*d*sizeof(int));				
+			}
+
+			for (int i = 0; i < 2; i++) {
+				for (int j = 0; j < d; j++) {
+					for (int k = 0; k < d; k++) {
+						in[i][j*d + k] = rand() - (RAND_MAX>>1);
+					}
+				}
+			}
+
+			size_t even = d + (d%2);
+			struct matrix A = {
+				in[0],
+				d,
+				d,
+				even,
+				0,
+				0
+			}, B = {
+				in[1],
+				d,
+				d,
+				even,
+				0,
+				0
+			};
+
+			int* trials[10];
+
+			clock_t naive_ticks = clock();
+			for (size_t i = 0; i < sizeof(trials)/sizeof(trials[0]); i++) {
+				trials[i] = naive(A, B).array;
+			}
+			naive_ticks = clock() - naive_ticks;
+			for (size_t i = 0; i < sizeof(trials)/sizeof(trials[0]); i++) {
+				free(trials[i]);
+			}
+
+			// Only one level of Strassen's to compare if its addition is an improvement over the naive algorithm at the size d*d:
+			n0 = d - 1;
+			clock_t strassen_ticks = clock();
+			for (size_t i = 0; i < sizeof(trials)/sizeof(trials[0]); i++) {
+				trials[i] = strassen(A, B).array;
+			}
+			strassen_ticks = clock() - strassen_ticks;
+			for (size_t i = 0; i < sizeof(trials)/sizeof(trials[0]); i++) {
+				free(trials[i]);
+			}
+
+			printf("%4d:  %15f  %20f",
+				   d,
+				   ((double)    naive_ticks)/(sizeof(trials)/sizeof(trials[0]))/CLOCKS_PER_SEC,
+				   ((double) strassen_ticks)/(sizeof(trials)/sizeof(trials[0]))/CLOCKS_PER_SEC);
+			if (strassen_ticks < naive_ticks) {
+				printf(" Won");
+			} else if (naive_ticks < strassen_ticks) {
+				printf(" Lost");
+			}
+			printf("\n");
+
+			for (int i = 0; i < 2; i++) {
+				free(in[i]);
+			}
+		}
+	} else if (option > 0) {
+		// Triangles.
+		srand(time(NULL));
+
+		float p = ((float) option)/100.0f;
+
+		int* edges = malloc(1024*1024*sizeof(int));
+		for (int i = 0; i < 1024; i++) {
+			for (int j = 0; j < i; j++) {
+				edges[i*1024 + j] = (rand() <= p*RAND_MAX) ? 1 : 0;
+				// Undirected graph:
+				edges[j*1024 + i] = edges[i*1024 + j];
+			}
+			edges[i*1024 + i] = 0;
+		}
+
+		struct matrix A = {
+			edges,
+			1024,
+			1024,
+			1024,
+			0,
+			0
+		};
+		struct matrix Asquared = strassen(A, A);
+		struct matrix Acubed = strassen(Asquared, A);
+
+		int triangles = 0;
+		for (int i = 0; i < 1024; i++) {
+			triangles += Acubed.array[i*1024 + i];
+		}
+		triangles /= 6;
+		printf("%d triangles\n", triangles);
+
+		free(edges);
+		free_matrix(Asquared, NULL_MATRIX);
+		free_matrix(Acubed, NULL_MATRIX);
+	} else {
+		fprintf(stderr, "unrecognized option %d\n", option);
+		return -1;
 	}
-	free_matrix(C, NULL_MATRIX);
 
 	return 0;
 }
