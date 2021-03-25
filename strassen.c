@@ -73,10 +73,10 @@ struct matrix add(struct matrix A,
 	assert(A.dimension == B.dimension);
 
 	if (!C.array) {
-		if (!A.array) {
-			return B;
-		} else if (!B.array) {
+		if (!B.array) {
 			return A;
+		} else if (!A.array && multiplier == 1) {
+			return B;
 		}
 
 		size_t
