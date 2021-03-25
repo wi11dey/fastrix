@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <assert.h>
 
-size_t n0 = 1;
+size_t n0 = 500;
 
 struct matrix {
 	int* array;
