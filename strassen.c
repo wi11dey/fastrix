@@ -72,13 +72,13 @@ struct matrix add(struct matrix A,
                   struct matrix C) {
 	assert(A.dimension == B.dimension);
 
-	if (!A.array) {
-		return B;
-	} else if (!B.array) {
-		return A;
-	}
-
 	if (!C.array) {
+		if (!A.array) {
+			return B;
+		} else if (!B.array) {
+			return A;
+		}
+
 		size_t
 			rows = min(max(A.rows - A.start_row, B.rows - B.start_row), A.dimension),
 			cols = min(max(A.cols - A.start_col, B.cols - B.start_col), A.dimension);
@@ -167,7 +167,7 @@ struct matrix strassen(struct matrix A,
 		h = quadrant(B, 1, 1);
 
 	struct matrix
-		f_plus_h  = add(f,  1, h, NULL_MATRIX),
+		f_minus_h = add(f, -1, h, NULL_MATRIX),
 		a_plus_b  = add(a,  1, b, NULL_MATRIX),
 		c_plus_d  = add(c,  1, d, NULL_MATRIX),
 		g_minus_e = add(g, -1, e, NULL_MATRIX),
@@ -179,7 +179,7 @@ struct matrix strassen(struct matrix A,
 		e_plus_f  = add(e,  1, f, NULL_MATRIX);
 
 	struct matrix P[] = {
-		[1] = strassen(a, f_plus_h),
+		[1] = strassen(a, f_minus_h),
 		[2] = strassen(a_plus_b, h),
 		[3] = strassen(c_plus_d, e),
 		[4] = strassen(d, g_minus_e),
@@ -188,29 +188,28 @@ struct matrix strassen(struct matrix A,
 		[7] = strassen(a_minus_c, e_plus_f)
 	};
 
+	free_matrix(a_minus_c, A);
 	free_matrix(a_plus_b,  A);
 	free_matrix(a_plus_d,  A);
 	free_matrix(b_minus_d, A);
 	free_matrix(c_plus_d,  A);
-	free_matrix(e_plus_f, B);
+	free_matrix(e_plus_f,  B);
 	free_matrix(e_plus_h,  B);
-	free_matrix(f_plus_h,  B);
+	free_matrix(f_minus_h, B);
 	free_matrix(g_minus_e, B);
 	free_matrix(g_plus_h,  B);
-	free_matrix(a_minus_c, A);
 
 	size_t
 		rows = min(A.rows, A.dimension),
 		cols = min(B.cols, B.dimension);
 	struct matrix C = {
-		calloc(rows*cols, sizeof(int)),
+		malloc(rows*cols*sizeof(int)),
 		rows,
 		cols,
 		A.dimension>>1,
 		0,
 		0
 	};
-	memset(C.array, 200, rows*cols*sizeof(int));
 
 	add(P[5], 1, P[4], C);
 	add(C, -1, P[2], C);
@@ -237,14 +236,6 @@ struct matrix strassen(struct matrix A,
 	for (int i = 1; i <= 7; i++) {
 		free_matrix(P[i], NULL_MATRIX);
 	}
-
-	for (size_t i = 0; i < C.rows; i++) {
-		for (size_t j = 0; j < C.cols; j++) {
-			printf("%d ", C.array[i*C.cols + j]);
-		}
-		printf("\n");
-	}
-	printf("\n");
 
 	C.dimension = A.dimension;
 	C.start_row = 0;
